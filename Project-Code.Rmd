@@ -1,0 +1,23 @@
+---
+title: "Project-Code"
+author: "Dennis Goldenberg"
+date: "2024-11-27"
+output: pdf_document
+---
+# Predicting CAT Bond Market Yield Performance using Time Series Data
+```{r, include = TRUE}
+library(readxl)
+suppressWarnings(library(ggplot2))
+```
+
+## Reading in Data
+```{r, include = TRUE}
+yield_w_EL <- read_xlsx(path = "data/yield_with_EL.xlsx",
+                        skip = 2)
+credit_spread <- read_xls(path = "data/Credit_Spread_BofA.xls",
+                          skip = 10)
+
+yield_w_EL$Date <- as.Date(yield_w_EL$Date)
+credit_spread$observation_date <- as.Date(credit_spread$observation_date)
+colnames(credit_spread) <- c("Date", "Spread")
+```
