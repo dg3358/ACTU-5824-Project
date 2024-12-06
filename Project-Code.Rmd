@@ -135,5 +135,20 @@ ccf(diff(yield_w_EL$`weekly average reinsurance market yield (USD)`),
 
 # Analyzing Correlation with S&P and EAFE
 ```{r, include = TRUE}
-
+ggplot(data = S_and_P) + geom_line(aes(x = Date, y = SP500))
 ```
+
+```{r, include = TRUE}
+q1_2015_ret <- (2074.828 - 2072.005)/2072.005
+q1_2015_ret
+```
+
+```{r, include = TRUE}
+yield_w_EL[c("Date", "Total Coupon CAT Bond Market (USD)")]
+```
+
+```{r, include = TRUE}
+(0.04529922 - 0.03767351)/0.03767351
+```
+
+
