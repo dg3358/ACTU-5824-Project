@@ -4,7 +4,7 @@ author: "Dennis Goldenberg"
 date: "2024-11-27"
 output: pdf_document
 ---
-# Predicting CAT Bond Market Yield Performance using Time Series Data
+# Predicting CAT Bond Expected Market Yield using Time Series Data
 ```{r, include = TRUE}
 library(readxl)
 suppressWarnings(library(quantmod))
@@ -13,63 +13,127 @@ suppressWarnings(library(ggplot2))
 
 ## Reading in Data
 ```{r, include = TRUE}
+#Response variable
 yield_w_EL <- read_xlsx(path = "data/yield_with_EL.xlsx",
                         skip = 2)
+yield_w_EL$Date <- as.Date(yield_w_EL$Date)
+
+#Credit Spread (for potential modeling of Reinsurance premium)
 credit_spread <- read_xls(path = "data/Credit_Spread_BofA.xls",
                           skip = 10)
-
-yield_w_EL$Date <- as.Date(yield_w_EL$Date)
 credit_spread$observation_date <- as.Date(credit_spread$observation_date)
 colnames(credit_spread) <- c("Date", "Spread")
-yield_w_EL
-```
 
-```{r, include = TRUE}
+#S & P Information
 S_and_P <- read_xls(path = "data/SP500.xls",
                     skip = 10)
 S_and_P$observation_date <- as.Date(S_and_P$observation_date)
 colnames(S_and_P) <- c("Date", "SP500")
-S_and_P
+
+#EAFE Index
+EAFE <- read.csv("data/EAFE International Index value.csv")
 ```
 
-
-```{r, include = TRUE}
-monthlyReturn(S_and_P)
-```
 
 ```{r, include = TRUE}
 ggplot(data = yield_w_EL) + geom_line(aes(x = Date,
-                                          y = `Total Coupon CAT Bond Market (USD)`))
+                                          y = `Money Market rate (USD)`))
+```
+```{r, include = TRUE}
+ggplot(data = yield_w_EL) + geom_line(aes(x = Date,
+                          y = `weekly average reinsurance market yield (USD)`))
+```
+```{r, include = TRUE}
+ggplot(data = credit_spread) + geom_line(aes(x = Date,
+                                       y = Spread/100))
 ```
 
 ```{r, include = TRUE}
-S_and_P$SP500 <- S_and_P$SP500/S_and_P$SP500[1]
-ggplot(data = S_and_P) + geom_line(aes(x = Date,
-                                       y = SP500))
-```
-
-
-```{r, include = TRUE}
-S_and_P_daily <- read_xls(path = "data/SP500_daily.xls",
-                    skip = 10)
-S_and_P_daily$observation_date <- as.Date(S_and_P_daily$observation_date)
-colnames(S_and_P_daily) <- c("Date", "SP500_daily")
-weekly_returns <- weeklyReturn(S_and_P_daily)
-```
-
-```{r, include = TRUE}
-week_S_and_P <- list(S_and_P$Date, weekly_returns$weekly.returns[-1])
-week_S_and_P <- as.data.frame(week_S_and_P)
-colnames(week_S_and_P) <- c("Date", "returns")
-rownames(week_S_and_P) <- seq(1:dim(week_S_and_P)[1])
-#ggplot(data = week_S_and_P) + geom_line(aes(x = Date, y = returns))
+ggplot() + geom_line(data = yield_w_EL,
+                      mapping = aes(x = Date,
+                      y = `weekly average reinsurance market yield (USD)`,
+                      color = 'Reinsurance Market Yield')) + 
+  geom_line(data = credit_spread, aes(x = Date, y = Spread/100, 
+                                      color = 'Credit Spread')) +
+  labs(colour = 'Quantity') + ylab('Value') + 
+  ggtitle("Credit spread & Expected Reinsurance Market Yield over time") + 
+  theme(legend.position = "inside", legend.position.inside =  c(0.15, .85),
+        plot.title = element_text(hjust = .5))
 ```
 
 ```{r, include = TRUE}
-S_and_P_daily
+ggplot() + geom_line(data = yield_w_EL,
+                      mapping = aes(x = Date,
+                      y = `weekly average reinsurance market yield (USD)`,
+                      color = 'Reinsurance Market Yield')) + 
+  geom_line(data = yield_w_EL, aes(x = Date, y = `Expected Loss (EL)`, 
+                                      color = 'Expected Loss')) +
+  labs(colour = 'Quantity') + ylab('Value') + 
+  ggtitle("Credit spread & Expected Reinsurance Market Yield over time") + 
+  theme(legend.position = "inside", legend.position.inside =  c(0.15, .85),
+        plot.title = element_text(hjust = .5))
 ```
 
-```{r}
-EAFE <- read.csv("data/EAFE International Index value.csv")
-EAFE
+## ACF/Stationarity Analysis
+
+### Response variable (reinsurance market yield)
+```{r, include = TRUE}
+acf(yield_w_EL$`weekly average reinsurance market yield (USD)`,
+    lag.max = 50)
+```
+Clearly, our response variable is a random walk.
+
+```{r, include = TRUE}
+acf(diff(yield_w_EL$`weekly average reinsurance market yield (USD)`))
+```
+
+```{r, include = TRUE}
+pacf(diff(yield_w_EL$`weekly average reinsurance market yield (USD)`))
+```
+
+Looks to be an AR(1) process.
+
+```{r, include = TRUE}
+ggplot() + geom_line(aes(x = yield_w_EL$Date[2:length(yield_w_EL$Date)],
+                         y = diff(yield_w_EL$`weekly average reinsurance market yield (USD)`)))
+```
+
+### BoFA Credit Spread
+```{r, include = TRUE}
+acf(credit_spread$Spread, lag.max = 50)
+```
+Also, clearly a random walk:
+```{r, include = TRUE}
+acf(diff(credit_spread$Spread/100))
+```
+```{r, include = TRUE}
+pacf(diff(credit_spread$Spread/100))
+```
+```{r, include = TRUE}
+ggplot() + geom_line(aes(x = credit_spread$Date[2:length(credit_spread$Date)],
+                         y = diff(credit_spread$Spread/100)))
+```
+
+```{r, include = TRUE}
+acf(yield_w_EL$`Expected Loss (EL)`, lag.max = 100)
+```
+Also, clearly a random walk.
+```{r, include = TRUE}
+acf(diff(yield_w_EL$`Expected Loss (EL)`))
+```
+Little evidence that serial correlation remains.
+
+
+## Relationships between variables analysis
+```{r, include=TRUE}
+ccf(diff(yield_w_EL$`weekly average reinsurance market yield (USD)`),
+    diff(credit_spread$Spread/100),
+    lag.max = 200)
+```
+
+
+
+# Analyzing Correlation with S&P and EAFE
+```{r, include = TRUE}
+
 ```
