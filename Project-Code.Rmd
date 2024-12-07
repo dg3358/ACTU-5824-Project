@@ -133,7 +133,26 @@ ccf(diff(yield_w_EL$`weekly average reinsurance market yield (USD)`),
 
 
 
-# Analyzing Correlation with S&P and EAFE
+# Analyzing Correlation with S&P
+```{r, include = TRUE}
+percent_changes_sp <- numeric(length(S_and_P$SP500) - 12)
+percent_changes_cat <- percent_changes_sp
+
+for (i in 1:(length(S_and_P$SP500) - 12)) {
+  percent_changes_sp[i] <- ((S_and_P$SP500[i + 12] - S_and_P$SP500[i]) / S_and_P$SP500[i]) * 100
+  percent_changes_cat[i] <- ((yield_w_EL$`Total Coupon CAT Bond Market (USD)`[i + 222 + 12] - yield_w_EL$`Total Coupon CAT Bond Market (USD)`[i + 222]) / yield_w_EL$`Total Coupon CAT Bond Market (USD)`[i + 222]) * 100
+}
+
+change_in_yield <- data.frame(
+  Date_sp = S_and_P$Date[1:(length(S_and_P$Date) - 12)],
+  Date_cat = yield_w_EL$Date[223:(length(S_and_P$Date) - 12 + 223 - 1)],
+  Percent_Change_sp = percent_changes_sp,
+  Percent_Change_cat = percent_changes_cat
+)
+
+head(change_in_yield)
+```
+
 ```{r, include = TRUE}
 ggplot(data = S_and_P) + geom_line(aes(x = Date, y = SP500))
 ```
