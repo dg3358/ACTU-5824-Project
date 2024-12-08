@@ -9,6 +9,7 @@ output: pdf_document
 library(readxl)
 suppressWarnings(library(quantmod))
 suppressWarnings(library(ggplot2))
+library(stats)
 ```
 
 ## Reading in Data
@@ -109,6 +110,9 @@ colnames(train_data) <- good_col_names
 colnames(test_data) <- good_col_names
 ```
 
+```{r, include = TRUE}
+full_data
+```
 
 
 
@@ -212,7 +216,7 @@ ccf(diff(train_data$Spread),
 
 
 ```
-Strong cross-correlation at about 40 week days (about 2 months) back.
+Strong cross-correlation at about 36 weeks (about 9 months) back.
 
 
 ### EL and Yield
@@ -229,11 +233,78 @@ cor(train_data[,c("Yield",
 ```{r, include = TRUE}
 ggplot(data = train_data) + geom_point(aes(x = EL, y = Yield))
 ```
+
+
+
 Strong correlation, EL should be an exogenous variable.
 
 ## Generating the ARIMA model
+
+### Model 1: ARIMA(1,1,0)
 ```{r, include = TRUE}
-print(yield_w_EL$Date[1])
+m1 <- arima(train_data$Yield, order = c(1,1,0), include.mean = TRUE)
+pred_m1 <- predict(m1, n.ahead = length(test_data$Yield))
+ggplot() + geom_line(aes(x = test_data$Date, y = test_data$Yield, 
+                         color = 'Actual')) + 
+  geom_line(aes(x = test_data$Date, y = pred_m1$pred,
+                color = 'predicted'))
+```
+### Model 2: ARIMA(1,1,0) w/ EL
+```{r, include = TRUE}
+m2 <- arima(train_data$Yield, order = c(1,1,0), 
+            xreg = train_data$EL,
+            include.mean = TRUE)
+m2
+```
+```{r, include = TRUE}
+pred_m2 <- predict(m2, n.ahead = length(test_data$Yield),
+                   newxreg = test_data$EL)
+ggplot() + geom_line(aes(x = test_data$Date, y = test_data$Yield, 
+                         color = 'Actual')) + 
+  geom_line(aes(x = test_data$Date, y = pred_m2$pred,
+                color = 'predicted'))
+```
+### Model 3: ARIMA(1,1,0) w/ EL and Credit Spread
+```{r, include = TRUE}
+spread_lag_36 <- diff(full_data$Spread)[seq(1, length(train_data$Spread) - 37)]
+spread_lag_36_test <- diff(full_data$Spread)[seq(length(train_data$Spread) - 36,
+                                        length(diff(full_data$Spread)) - 36)]
+yield_for_m3 <- train_data$Yield[seq(38,
+                                length(train_data$Yield))]
+EL_for_m3 <-  train_data$EL[seq(38, length(train_data$EL))]
+train_data_m3 <- as.data.frame(alist(
+  Yield = yield_for_m3, EL = EL_for_m3, Spread = spread_lag_36))
+m3 <- arima(train_data_m3$Yield, order = c(1,1,0),
+            xreg = as.matrix.data.frame(train_data_m3[,c("EL","Spread")]))
+```
+
+```{r, include = TRUE}
+m3
+```
+
+```{r, include = TRUE}
+test_data_m3 <- as.data.frame(alist(
+  Yield = test_data$Yield,
+  EL = test_data$EL,
+  Spread_lag_36 = spread_lag_36_test
+))
+```
+
+```{r, include = TRUE}
+pred_m3 <- predict(m3, n.ahead = length(test_data$Yield),
+                   newxreg = as.matrix.data.frame(test_data_m3[,c("EL","Spread_lag_36")]))
+ggplot() + geom_line(aes(x = test_data$Date, y = test_data$Yield, 
+                         color = 'Actual')) + 
+  geom_line(aes(x = test_data$Date, y = pred_m2$pred,
+                color = 'predicted m2')) + 
+  geom_line(aes(x = test_data$Date, y = pred_m3$pred,
+                color = 'predicted m3'))
+```
+
+```{r, include = TRUE}
+train_pred <- train_data$Yield + m1$residuals
+ggplot() + geom_line(aes(x = train_data$Date, y = train_data$Yield)) + 
+  geom_line(aes(x = train_data$Date, y = train_pred))
 ```
 
 # Analyzing Correlation with S&P
