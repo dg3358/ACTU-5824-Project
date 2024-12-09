@@ -5,11 +5,12 @@ date: "2024-11-27"
 output: pdf_document
 ---
 # Predicting CAT Bond Expected Market Yield using Time Series Data
-```{r, include = TRUE}
+```{r, include = TRUE, results = 'hide'}
 library(readxl)
 suppressWarnings(library(quantmod))
 suppressWarnings(library(ggplot2))
 library(stats)
+library(rethinking)
 ```
 
 ## Reading in Data
@@ -330,10 +331,31 @@ ggplot() + geom_line(aes(x = test_data$Date, y = test_data$Yield,
   labs(colour = 'Quantity') + xlab('Date') + ylab('Yield')
 ```
 
+
 ```{r, include = TRUE}
-train_pred <- train_data$Yield + m1$residuals
-ggplot() + geom_line(aes(x = train_data$Date, y = train_data$Yield)) + 
-  geom_line(aes(x = train_data$Date, y = train_pred))
+BIC_1 <- -2 * m1$loglik + 1 * log(length(train_data$Yield))
+BIC_2 <- -2 * m2$loglik + 2 * log(length(train_data$Yield))
+BIC_3 <- -2 * m3$loglik + 3 * log(length(train_data_m3$Yield))
+BIC_frame <- as.data.frame(alist(model = c("m1", "m2", "m3"),
+                                 BIC = c(BIC_1, BIC_2, BIC_3)))
+BIC_frame
+```
+
+
+```{r, include = TRUE}
+ggplot() + geom_line(aes(x = test_data$Date, y = test_data$Yield, 
+                         color = 'Actual')) +
+  geom_line(aes(x = test_data$Date, y = pred_m1$pred,
+                color = 'm1')) +
+  geom_line(aes(x = test_data$Date, y = pred_m2$pred,
+                color = 'm2')) + 
+  geom_line(aes(x = test_data$Date, y = pred_m3$pred,
+                color = 'm3')) + 
+  labs(colour = 'Predictions') + xlab('Date') + ylab('Yield') + 
+  ggtitle("Model Predictions of Reinsurance Market Yield") + 
+  theme(plot.title = element_text(hjust = .5))
+  
+  
 ```
 
 # Analyzing Correlation with S&P
@@ -352,25 +374,7 @@ change_in_yield <- data.frame(
   Percent_Change_sp = percent_changes_sp,
   Percent_Change_cat = percent_changes_cat
 )
-
-head(change_in_yield)
 ```
 
-```{r, include = TRUE}
-ggplot(data = S_and_P) + geom_line(aes(x = Date, y = SP500))
-```
-
-```{r, include = TRUE}
-q1_2015_ret <- (2074.828 - 2072.005)/2072.005
-q1_2015_ret
-```
-
-```{r, include = TRUE}
-yield_w_EL[c("Date", "Total Coupon CAT Bond Market (USD)")]
-```
-
-```{r, include = TRUE}
-(0.04529922 - 0.03767351)/0.03767351
-```
 
 
