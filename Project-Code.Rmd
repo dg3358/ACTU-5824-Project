@@ -25,6 +25,12 @@ credit_spread <- read_xls(path = "data/Credit_Spread_BofA_weekly.xls",
 credit_spread$observation_date <- as.Date(credit_spread$observation_date)
 colnames(credit_spread) <- c("Date", "Spread")
 
+#Break-Even Interest Rate (expected measure of inflation)
+BEIR <- read_xls(path = "data/BEIR.xls",
+                          skip = 10)
+BEIR$observation_date <- as.Date(BEIR$observation_date)
+colnames(BEIR) <- c("Date", "BEIR")
+
 #S & P Information
 S_and_P <- read_xls(path = "data/SP500.xls",
                     skip = 10)
@@ -69,6 +75,28 @@ ggplot() + geom_line(data = yield_w_EL,
   theme(legend.position = "inside", legend.position.inside =  c(0.15, .85),
         plot.title = element_text(hjust = .5))
 ```
+```{r, include = TRUE}
+ggplot() + geom_line(data = yield_w_EL,
+                      mapping = aes(x = Date,
+                      y = `weekly average reinsurance market yield (USD)`,
+                      color = 'Reinsurance Market Yield')) + 
+  geom_line(data = BEIR, aes(x = Date, y = BEIR/100, 
+                                      color = 'BEIR')) +
+  labs(colour = 'Quantity') + ylab('Value') + 
+  scale_x_continuous("Date", breaks = c(14975, 15340, 15705,
+                                        16070,16435, 16800,
+                                        17165, 17530, 17895,
+                                        18260, 18625, 18990,
+                                        19355, 19720),
+                     labels = c(2011, 2012, 2013, 2014, 2015, 2016,
+                                2017, 2018, 2019, 2020, 2021, 2022,
+                                2023, 2024)) + 
+  ggtitle("Credit spread & Expected Reinsurance Market Yield over time") + 
+  theme(legend.position = "inside", legend.position.inside =  c(0.15, .85),
+        plot.title = element_text(hjust = .5))
+```
+
+
 
 
 ```{r, include = TRUE}
@@ -159,7 +187,7 @@ acf(diff(train_data$Spread))
 ```{r, include = TRUE}
 pacf(diff(train_data$Spread/100))
 ```
-Statistically significant lags up to lag 4. I run an ar model, with order.max at 10, to check for stationarity:
+Statistically significant lags up to lag 4. I run an ar model, with order.max at 5, to check for stationary:
 
 ```{r, include = TRUE}
 spread_ar <- ar(diff(train_data$Spread), aic = TRUE, order.max = 5,
@@ -212,9 +240,7 @@ ccf(diff(train_data$Spread),
 ```{r, include = TRUE}
 ccf(diff(train_data$Spread),
     diff(train_data$Yield),
-    lag.max = 200, plot = FALSE)[seq(-50, -25, 1)]
-
-
+    lag.max = 200, plot = FALSE)[seq(-40, -30, 1)]
 ```
 Strong cross-correlation at about 36 weeks (about 9 months) back.
 
@@ -246,13 +272,18 @@ m1 <- arima(train_data$Yield, order = c(1,1,0), include.mean = TRUE)
 pred_m1 <- predict(m1, n.ahead = length(test_data$Yield))
 ggplot() + geom_line(aes(x = test_data$Date, y = test_data$Yield, 
                          color = 'Actual')) + 
+  labs(colour = 'Quantity') + xlab('Date') + ylab('Yield') +
   geom_line(aes(x = test_data$Date, y = pred_m1$pred,
                 color = 'predicted'))
 ```
+```{r, include = TRUE}
+m1
+```
+
 ### Model 2: ARIMA(1,1,0) w/ EL
 ```{r, include = TRUE}
 m2 <- arima(train_data$Yield, order = c(1,1,0), 
-            xreg = train_data$EL,
+            xreg = train_data$EL, 
             include.mean = TRUE)
 m2
 ```
@@ -261,24 +292,23 @@ pred_m2 <- predict(m2, n.ahead = length(test_data$Yield),
                    newxreg = test_data$EL)
 ggplot() + geom_line(aes(x = test_data$Date, y = test_data$Yield, 
                          color = 'Actual')) + 
+  labs(colour = 'Quantity') + xlab('Date') + ylab('Yield') +
   geom_line(aes(x = test_data$Date, y = pred_m2$pred,
                 color = 'predicted'))
 ```
 ### Model 3: ARIMA(1,1,0) w/ EL and Credit Spread
+
 ```{r, include = TRUE}
-spread_lag_36 <- diff(full_data$Spread)[seq(1, length(train_data$Spread) - 37)]
-spread_lag_36_test <- diff(full_data$Spread)[seq(length(train_data$Spread) - 36,
+spread_lag_36 <- full_data$Spread[seq(1, length(train_data$Spread) - 36)]
+spread_lag_36_test <- full_data$Spread[seq(length(train_data$Spread) - 36,
                                         length(diff(full_data$Spread)) - 36)]
-yield_for_m3 <- train_data$Yield[seq(38,
+yield_for_m3 <- train_data$Yield[seq(37,
                                 length(train_data$Yield))]
-EL_for_m3 <-  train_data$EL[seq(38, length(train_data$EL))]
+EL_for_m3 <-  train_data$EL[seq(37, length(train_data$EL))]
 train_data_m3 <- as.data.frame(alist(
   Yield = yield_for_m3, EL = EL_for_m3, Spread = spread_lag_36))
 m3 <- arima(train_data_m3$Yield, order = c(1,1,0),
             xreg = as.matrix.data.frame(train_data_m3[,c("EL","Spread")]))
-```
-
-```{r, include = TRUE}
 m3
 ```
 
@@ -295,10 +325,9 @@ pred_m3 <- predict(m3, n.ahead = length(test_data$Yield),
                    newxreg = as.matrix.data.frame(test_data_m3[,c("EL","Spread_lag_36")]))
 ggplot() + geom_line(aes(x = test_data$Date, y = test_data$Yield, 
                          color = 'Actual')) + 
-  geom_line(aes(x = test_data$Date, y = pred_m2$pred,
-                color = 'predicted m2')) + 
   geom_line(aes(x = test_data$Date, y = pred_m3$pred,
-                color = 'predicted m3'))
+                color = 'predicted')) + 
+  labs(colour = 'Quantity') + xlab('Date') + ylab('Yield')
 ```
 
 ```{r, include = TRUE}
