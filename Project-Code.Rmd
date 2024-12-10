@@ -5,7 +5,7 @@ date: "2024-11-27"
 output: pdf_document
 ---
 # Predicting CAT Bond Expected Market Yield using Time Series Data
-```{r, include = TRUE, results = 'hide'}
+```{r, include = FALSE, results = 'hide'}
 library(readxl)
 suppressWarnings(library(quantmod))
 suppressWarnings(library(ggplot2))
